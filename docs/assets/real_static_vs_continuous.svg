@@ -1,0 +1,24 @@
+<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">
+  <rect width="720" height="320" fill="white"/>
+  <text x="360.0" y="20" text-anchor="middle" font-size="16" font-weight="bold">Real model (Qwen2.5-0.5B, MPS): static vs continuous batching</text>
+  <rect x="80" y="137" width="48" height="123" fill="#d62728"/>
+  <text x="104" y="131" text-anchor="middle" font-size="12">53.1</text>
+  <rect x="520" y="30" width="14" height="14" fill="#d62728"/><text x="540" y="42" font-size="13">static</text>
+  <rect x="135" y="60" width="48" height="200" fill="#2ca02c"/>
+  <text x="159" y="54" text-anchor="middle" font-size="12">86.3</text>
+  <rect x="520" y="52" width="14" height="14" fill="#2ca02c"/><text x="540" y="64" font-size="13">continuous</text>
+  <text x="160" y="278" text-anchor="middle" font-size="12">throughput (tok/s)</text>
+  <text x="160" y="293" text-anchor="middle" font-size="10" fill="#888">higher is better</text>
+  <rect x="280" y="60" width="48" height="200" fill="#d62728"/>
+  <text x="304" y="54" text-anchor="middle" font-size="12">14.3</text>
+  <rect x="335" y="144" width="48" height="116" fill="#2ca02c"/>
+  <text x="359" y="138" text-anchor="middle" font-size="12">8.3</text>
+  <text x="360" y="278" text-anchor="middle" font-size="12">p50 latency (s)</text>
+  <text x="360" y="293" text-anchor="middle" font-size="10" fill="#888">lower is better</text>
+  <rect x="480" y="60" width="48" height="200" fill="#d62728"/>
+  <text x="504" y="54" text-anchor="middle" font-size="12">19.8</text>
+  <rect x="535" y="128" width="48" height="132" fill="#2ca02c"/>
+  <text x="559" y="122" text-anchor="middle" font-size="12">13.1</text>
+  <text x="560" y="278" text-anchor="middle" font-size="12">p99 latency (s)</text>
+  <text x="560" y="293" text-anchor="middle" font-size="10" fill="#888">lower is better</text>
+</svg>

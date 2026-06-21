@@ -1,0 +1,11 @@
+<svg viewBox="0 0 720 460" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif">
+  <rect width="720" height="460" fill="white"/>
+  <text x="360.0" y="30" text-anchor="middle" font-size="18" font-weight="bold">Static vs continuous batching — throughput vs tail latency</text>
+  <line x1="70" y1="390" x2="650" y2="390" stroke="#999"/>
+  <line x1="70" y1="70" x2="70" y2="390" stroke="#999"/>
+  <text x="360.0" y="440" text-anchor="middle" font-size="14">throughput (tokens/s)  →</text>
+  <text x="20" y="230.0" text-anchor="middle" font-size="14" transform="rotate(-90 20 230.0)">p99 latency (s)  →</text>
+  <polyline points="241.6,149.4 241.6,119.9 241.6,100.1 241.6,90.8 239.5,90.5 239.5,85.2" fill="none" stroke="#d62728" stroke-width="2.5"/><circle cx="241.6" cy="149.4" r="4" fill="#d62728"/><circle cx="241.6" cy="119.9" r="4" fill="#d62728"/><circle cx="241.6" cy="100.1" r="4" fill="#d62728"/><circle cx="241.6" cy="90.8" r="4" fill="#d62728"/><circle cx="239.5" cy="90.5" r="4" fill="#d62728"/><circle cx="239.5" cy="85.2" r="4" fill="#d62728"/><rect x="480" y="60" width="14" height="14" fill="#d62728"/><text x="500" y="72" font-size="14" fill="#333">static (waits for slowest)</text>
+  <polyline points="612.2,363.9 620.4,339.4 621.3,322.1 621.8,314.3 622.2,310.0 622.4,305.5" fill="none" stroke="#2ca02c" stroke-width="2.5"/><circle cx="612.2" cy="363.9" r="4" fill="#2ca02c"/><circle cx="620.4" cy="339.4" r="4" fill="#2ca02c"/><circle cx="621.3" cy="322.1" r="4" fill="#2ca02c"/><circle cx="621.8" cy="314.3" r="4" fill="#2ca02c"/><circle cx="622.2" cy="310.0" r="4" fill="#2ca02c"/><circle cx="622.4" cy="305.5" r="4" fill="#2ca02c"/><rect x="480" y="85" width="14" height="14" fill="#2ca02c"/><text x="500" y="97" font-size="14" fill="#333">continuous (refills slots)</text>
+  <text x="650" y="408" text-anchor="end" font-size="11" fill="#666">further right + lower = better</text>
+</svg>
