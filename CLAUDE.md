@@ -231,6 +231,11 @@ Python is managed with `uv`; the venv is pinned to 3.12 via `.python-version`.
 - `make typecheck` — `uv run mypy` (strict on `src/`).
 - `make bench` — run the static-vs-continuous benchmark; writes the money graph +
   summary to `src/inference_demo/bench/out/` (`static_vs_continuous.svg` / `.md`).
-- `make dev` / `make up` — placeholders until phases 4 / 7.
+- `make dev` — serve the control-plane API on `127.0.0.1:8000`
+  (`uvicorn inference_demo.gateway.app:app`). Background loop steps the pool + pumps
+  the load generator. Key endpoints: `POST /api/submit`, `POST /api/loadgen`,
+  `POST /api/strategy`, `POST /api/autoscaler`, `POST /api/workers/kill`,
+  `GET /api/snapshot`, `GET /api/stream` (SSE), `GET /metrics` (Prometheus).
+- `make up` — placeholder until phase 7 (docker compose).
 
-(`dev`, `docker compose up`, and demo scripts get filled in as those phases land.)
+(`docker compose up` and demo scripts get filled in as those phases land.)

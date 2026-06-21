@@ -16,9 +16,9 @@ typecheck:
 bench:
 	uv run python -m inference_demo.bench.static_vs_continuous
 
-# Placeholders wired up in later phases.
 dev:
-	@echo "dev: implemented in phase 4 (gateway/app.py)"
+	uv run uvicorn inference_demo.gateway.app:app --host 127.0.0.1 --port 8000
 
+# Placeholder wired up in phase 7.
 up:
 	@echo "up: implemented in phase 7 (docker compose)"
