@@ -20,6 +20,7 @@ src/inference_demo/bench/out/
 # Node / UI (phase 5)
 node_modules/
 ui/dist/
+*.tsbuildinfo
 
 # OS / editor
 .DS_Store

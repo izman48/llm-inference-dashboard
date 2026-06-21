@@ -238,4 +238,13 @@ Python is managed with `uv`; the venv is pinned to 3.12 via `.python-version`.
   `GET /api/snapshot`, `GET /api/stream` (SSE), `GET /metrics` (Prometheus).
 - `make up` — placeholder until phase 7 (docker compose).
 
+React control console (`ui/`, Vite + TS; needs Node/npm):
+
+- `make ui-install` — `npm --prefix ui install`.
+- `make ui-dev` — Vite dev server (proxies `/api` + `/metrics` to `127.0.0.1:8000`).
+  Run `make dev` (gateway) alongside it. Note: `localhost` may resolve to IPv6 where
+  another app can sit — use `127.0.0.1:5173`.
+- `make ui-build` — `tsc -b && vite build` (must be clean).
+- `make ui-test` — Vitest component + smoke tests.
+
 (`docker compose up` and demo scripts get filled in as those phases land.)

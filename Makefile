@@ -1,4 +1,4 @@
-.PHONY: setup test lint typecheck dev bench up
+.PHONY: setup test lint typecheck dev bench up ui-install ui-dev ui-build ui-test
 
 setup:
 	uv sync --extra dev
@@ -18,6 +18,19 @@ bench:
 
 dev:
 	uv run uvicorn inference_demo.gateway.app:app --host 127.0.0.1 --port 8000
+
+# ---- React control console (ui/) ----
+ui-install:
+	npm --prefix ui install
+
+ui-dev:
+	npm --prefix ui run dev
+
+ui-build:
+	npm --prefix ui run build
+
+ui-test:
+	npm --prefix ui test
 
 # Placeholder wired up in phase 7.
 up:
