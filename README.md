@@ -32,8 +32,8 @@ hardware-agnostic story, and what makes the whole control plane deterministicall
 | backend | what it is | status |
 | --- | --- | --- |
 | **SimWorker** | no real model; tunable latency/throughput + modelled prefix-cache hit. Runs anywhere, fakes hundreds of workers. | ✅ built (Phase 1) |
-| **OpenAIWorker** | points at any OpenAI-compatible endpoint (Ollama/vLLM/LM Studio). Exercises routing/observability, *not* our batching. | ⏳ Phase 6 |
-| **RealModelWorker** | a real small model with **our** continuous batching (own the decode loop). | ⏳ Phase 6 |
+| **OpenAIWorker** | points at any OpenAI-compatible endpoint (Ollama/vLLM/LM Studio). Exercises routing/observability, *not* our batching. | ✅ built (Phase 6), mock-tested in CI |
+| **RealModelWorker** | a real small model (Qwen2.5-0.5B) with **our** continuous batched decode loop (transformers + MPS). | ✅ built (Phase 6), verified on-device |
 
 ```python
 class Worker(Protocol):
@@ -136,10 +136,12 @@ Key endpoints: `POST /api/submit`, `/api/loadgen`, `/api/strategy`, `/api/autosc
 - The benchmark's absolute numbers are sim-defined; they demonstrate the structural win, not a
   hardware claim.
 
-## Roadmap (human-in-the-loop)
+## Roadmap
 
-- **Phase 6** — `OpenAIWorker` (mock-tested in CI) + `RealModelWorker` with our own batching on a
-  real small model (host-native). Re-run the benchmark for real.
+- **Phase 6** ✅ — `OpenAIWorker` (mock-tested in CI) + `RealModelWorker` with our own continuous
+  batched decode on a real model, verified on-device (greedy matches HF `generate()`; batched
+  decode matches per-sequence decode). Remaining: re-run the static-vs-continuous benchmark on the
+  real model to confirm the sim's story.
 - **Phase 7** — Docker Compose + VPS deploy (sim-only public demo, gated controls, hard caps).
 - **Phase 8** — architecture diagram, recorded demo, hosted URL, full prior-work writeup.
 
