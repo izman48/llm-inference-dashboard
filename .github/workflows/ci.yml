@@ -56,3 +56,39 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # Deploy the co-host stack to the Hetzner box on merge to main, only after the
+  # python + ui gates pass. Builds from source on the box (same as the manual
+  # `docker compose -f deploy/docker-compose.cohost.yml up -d --build`).
+  #
+  # Required repo secrets (Settings -> Secrets and variables -> Actions):
+  #   DEPLOY_HOST      box hostname / IP
+  #   DEPLOY_USER      ssh user (e.g. root)
+  #   DEPLOY_SSH_KEY   private key whose public half is in the box's authorized_keys
+  #   DEPLOY_PATH      absolute path to the repo clone on the box
+  #   PROXY_NET        existing reverse-proxy docker network (the cohost NET arg)
+  #   CONTROL_TOKEN    stable control token (baked into the UI bundle; keep it
+  #                    constant across deploys or existing clients break)
+  deploy:
+    needs: [python, ui]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-vps
+      cancel-in-progress: false
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git remote set-url origin https://github.com/izman48/llm-control-plane.git
+            git fetch --prune origin
+            git reset --hard origin/main
+            NET='${{ secrets.PROXY_NET }}' CONTROL_TOKEN='${{ secrets.CONTROL_TOKEN }}' \
+              docker compose -f deploy/docker-compose.cohost.yml up -d --build
+            docker image prune -f
