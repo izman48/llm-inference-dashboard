@@ -80,7 +80,8 @@ class MetricsSnapshot:
 class Metrics:
     def __init__(self, window: int = 200, half_life_s: float = 0.5) -> None:
         # half_life_s sets how fast the throughput / offered-load EWMAs respond and
-        # decay: after work stops the rate halves every half_life_s of sim time.
+        # decay: after work stops the rate halves every half_life_s of pool-clock time
+        # (real wall-clock on the real backends; simulated time for sim).
         self._window = window
         self._half_life_s = half_life_s
         self._init_state()

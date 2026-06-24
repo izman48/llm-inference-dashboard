@@ -4,6 +4,8 @@ a steppable live system over sim workers. Driven deterministically here.
 
 from __future__ import annotations
 
+import pytest
+
 from inference_demo.pool import build_pool
 from inference_demo.types import Priority, Request
 
@@ -98,6 +100,24 @@ def test_strategy_swap_changes_routing_name() -> None:
     pool = build_pool(n_workers=2, autoscale=False)
     pool.set_strategy("round-robin")
     assert pool.router.strategy_name == "round-robin"
+
+
+def test_real_backend_advances_by_wall_clock_not_fixed_step() -> None:
+    # sim advances by the modelled step (deterministic). A real backend advances by
+    # measured wall time, so a slow decode step isn't credited to a fixed 0.05s —
+    # which would otherwise inflate throughput and shrink TTFT.
+    fake = {"t": 100.0}
+    pool = build_pool(n_workers=1, backend="sim", autoscale=False)
+    pool._time_fn = lambda: fake["t"]  # inject a controllable clock
+    pool.step()
+    assert pool.clock == pool.step_s  # sim: modelled step, ignores wall clock
+
+    pool.set_backend("openai", base_url="http://x:11434")  # real backend (resets the clock)
+    pool.step()  # first real step seeds with step_s
+    seeded = pool.clock
+    fake["t"] = 100.7  # 0.7s of real time elapses before the next step
+    pool.step()
+    assert pool.clock - seeded == pytest.approx(0.7)  # advanced by wall time, not step_s
 
 
 def test_set_backend_switches_and_rebuilds_pool() -> None:

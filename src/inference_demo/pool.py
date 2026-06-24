@@ -13,6 +13,7 @@ loop body. The gateway drives it (background loop in prod, explicit steps in tes
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 
 from inference_demo.autoscaler import Autoscaler, AutoscalerConfig, PoolSnapshot, ScaleAction
@@ -44,6 +45,7 @@ class PoolManager:
         factory_builder: FactoryBuilder | None = None,
         base_url: str = "",
         model: str = "",
+        time_fn: Callable[[], float] = time.monotonic,
     ) -> None:
         self._worker_factory = worker_factory
         self.step_s = step_s
@@ -57,6 +59,9 @@ class PoolManager:
         self._factory_builder = factory_builder
         self._base_url = base_url
         self._model = model
+        # Wall clock for advancing time on the real backends (see _advance_dt).
+        self._time_fn = time_fn
+        self._last_step_wall: float | None = None
 
         self._initial_workers = n_workers
         self._clock = 0.0
@@ -152,15 +157,36 @@ class PoolManager:
         return wid
 
     def step(self) -> None:
-        self._clock += self.step_s
+        dt = self._advance_dt()
+        self._clock += dt
         self._steps += 1
         for w in self._workers.values():
             for ev in w.step():
                 self.metrics.on_token(str(ev.seq_id), ts=self._clock, is_final=ev.is_final)
         self.metrics.set_in_flight(sum(w.in_flight() for w in self._workers.values()))
-        self.metrics.tick(self.step_s)  # advance throughput / offered-load EWMAs
+        self.metrics.tick(dt)  # advance throughput / offered-load EWMAs by real elapsed time
         if self.autoscale_enabled and self._steps % self._autoscale_every == 0:
             self._maybe_scale()
+
+    def _advance_dt(self) -> float:
+        """How much time one step represents — the basis for clock, throughput and
+        latency timings.
+
+        ``sim`` is a deterministic simulation, so a step advances by the *modelled*
+        ``step_s`` (reproducible, and right since the live loop sleeps that long). The
+        real backends do real, variable-time work: a single MPS decode step can block
+        for well over ``step_s``, so crediting its tokens to a fixed 0.05s would inflate
+        throughput (and shrink TTFT). For those we advance by *measured wall-clock*
+        time instead, clamped to a sane range to ride out a stall or GC pause.
+        """
+        if self._backend == "sim":
+            return self.step_s
+        now = self._time_fn()
+        last = self._last_step_wall
+        self._last_step_wall = now
+        if last is None:
+            return self.step_s  # seed the first step after start / reset / switch
+        return min(max(now - last, 1e-3), 5.0)
 
     def reset(self) -> None:
         """Restore the pool to its initial state: rebuild the starting worker set,
@@ -170,6 +196,7 @@ class PoolManager:
         self._steps = 0
         self._next_id = 0
         self._last_scale_clock = 0.0
+        self._last_step_wall = None
         self._workers.clear()
         for _ in range(self._initial_workers):
             self._add_worker()
