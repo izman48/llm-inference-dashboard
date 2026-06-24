@@ -57,3 +57,11 @@ def test_submit_clamps_token_counts() -> None:
     c = _client(max_tokens_cap=32)
     r = c.post("/api/submit", json={"prompt_tokens": 9999, "max_tokens": 9999})
     assert r.status_code == 200  # accepted, but clamped internally (no error)
+
+
+def test_backend_switching_blocked_on_public_demo() -> None:
+    # The hosted box must stay sim-only — taking an arbitrary endpoint URL there is SSRF.
+    c = _client(demo=True)
+    assert c.get("/api/backends").json()["switchable"] is False
+    r = c.post("/api/backend", json={"backend": "openai", "base_url": "http://x:11434"})
+    assert r.status_code == 403

@@ -165,9 +165,15 @@ The structural win holds on real hardware. Two findings worth calling out:
 
 ## The control console
 
-Not a read-only dashboard — a console a reviewer **operates**:
+Not a read-only dashboard — a console a reviewer **operates** (every control has an `(i)`
+tooltip explaining the jargon):
 
+- **Backend selector** — switch the live backend (Sim ↔ Endpoint, with a URL + model config
+  panel) and watch the same control plane drive it. Reflects the actually-running backend.
+  Switching is disabled on the public demo (sim-only — taking an arbitrary endpoint URL on a
+  hosted box is SSRF); real-model is offered only where the host-native deps are present.
 - **Load generator** — steady / burst / spike presets, adjustable rate, start/stop.
+- **Reset** — one click restores the starting pool + clears metrics (recover a messy demo).
 - **Routing** — switch strategy live and watch the worker-pool view and p99 react.
 - **Autoscaler** — toggle it, set min/max + target queue depth, watch it add workers under
   pressure and reclaim them when idle.

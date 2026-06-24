@@ -31,9 +31,25 @@ export interface AutoscalerView {
 export interface PoolView {
   num_workers: number;
   strategy: string;
+  backend: string;
+  endpoint: { base_url: string; model: string };
   clock_s: number;
   autoscaler: AutoscalerView;
   workers: WorkerView[];
+}
+
+export interface BackendOption {
+  id: string;
+  label: string;
+  available: boolean;
+  reason: string;
+}
+
+export interface BackendsInfo {
+  current: string;
+  switchable: boolean;
+  available: BackendOption[];
+  endpoint: { base_url: string; model: string };
 }
 
 export interface RecentRow {

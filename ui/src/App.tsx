@@ -87,7 +87,7 @@ export function App() {
           <RecentRequests rows={recent} />
         </div>
         <aside className="col-side">
-          <BackendSelector />
+          <BackendSelector current={pool.backend} />
           <StrategySwitcher
             strategies={strategies}
             current={pool.strategy}

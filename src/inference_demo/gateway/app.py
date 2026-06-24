@@ -9,6 +9,7 @@ tests, so contract tests stay deterministic.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -65,6 +66,33 @@ class StepBody(BaseModel):
 
 class StrategyBody(BaseModel):
     name: str
+
+
+class BackendBody(BaseModel):
+    backend: Literal["sim", "openai", "realmodel"]
+    base_url: str | None = None
+    model: str | None = None
+
+
+def _available_backends() -> list[dict[str, object]]:
+    """Which backends this process can switch to. sim + openai always; realmodel only
+    when the heavy deps are installed (host-native; never inside the Linux Docker image)."""
+    realmodel = (
+        importlib.util.find_spec("torch") is not None
+        and importlib.util.find_spec("transformers") is not None
+    )
+    return [
+        {"id": "sim", "label": "Sim", "available": True, "reason": ""},
+        {"id": "openai", "label": "Endpoint (self-hosted)", "available": True, "reason": ""},
+        {
+            "id": "realmodel",
+            "label": "Real model (self-hosted)",
+            "available": realmodel,
+            "reason": ""
+            if realmodel
+            else "host-native only (needs the realmodel extra); not in this deployment",
+        },
+    ]
 
 
 class AutoscalerBody(BaseModel):
@@ -162,6 +190,27 @@ def create_app(
             raise HTTPException(status_code=422, detail=f"unknown strategy: {body.name!r}")
         pool.set_strategy(body.name)
         return {"strategy": body.name}
+
+    @app.get("/api/backends")
+    def backends() -> dict[str, object]:
+        # `switchable` is false on the public demo: a hosted box must stay sim-only,
+        # never taking an arbitrary endpoint URL server-side (SSRF). See README.
+        return {
+            "current": pool.backend,
+            "switchable": not cfg.demo,
+            "available": _available_backends(),
+            "endpoint": pool.endpoint,
+        }
+
+    @app.post("/api/backend", dependencies=gated)
+    def set_backend(body: BackendBody) -> dict[str, object]:
+        if cfg.demo:
+            raise HTTPException(403, "backend switching is disabled on the public demo (sim-only)")
+        available = {b["id"] for b in _available_backends() if b["available"]}
+        if body.backend not in available:
+            raise HTTPException(422, detail=f"backend not available here: {body.backend!r}")
+        pool.set_backend(body.backend, base_url=body.base_url, model=body.model)
+        return {"backend": pool.backend, "endpoint": pool.endpoint}
 
     @app.post("/api/autoscaler", dependencies=gated)
     def set_autoscaler(body: AutoscalerBody) -> dict[str, object]:

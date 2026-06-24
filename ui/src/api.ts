@@ -1,4 +1,4 @@
-import type { AutoscalerView, Preset, Snapshot } from "./types";
+import type { AutoscalerView, BackendsInfo, Preset, Snapshot } from "./types";
 
 // Optional control token (baked at build time) — sent on mutating requests so a
 // gated public demo stays fully clickable. Not a real secret (it ships in the
@@ -59,6 +59,15 @@ export const killWorker = () =>
 
 export const resetPool = () =>
   postJSON<{ reset: boolean; num_workers: number }>("/api/reset", {});
+
+export async function getBackends(): Promise<BackendsInfo> {
+  const res = await fetch("/api/backends");
+  if (!res.ok) throw new Error(`/api/backends -> ${res.status}`);
+  return (await res.json()) as BackendsInfo;
+}
+
+export const setBackend = (backend: string, base_url?: string, model?: string) =>
+  postJSON<{ backend: string }>("/api/backend", { backend, base_url, model });
 
 /** Subscribe to the live SSE snapshot stream. Returns an unsubscribe fn. */
 export function subscribe(onSnapshot: (s: Snapshot) => void): () => void {

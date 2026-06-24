@@ -1,27 +1,89 @@
+import { useEffect, useState } from "react";
+import * as api from "../api";
 import { GLOSSARY } from "../glossary";
+import type { BackendsInfo } from "../types";
 import { InfoTip } from "./InfoTip";
 
-// Backend selector. The hosted demo runs the Sim backend; the real-model and
-// OpenAI-compatible endpoint backends are self-hosted only (an endpoint can't be
-// taken server-side on a public box — SSRF — and a hosted box can't reach a
-// reviewer's localhost model anyway).
-const BACKENDS = [
-  { id: "sim", label: "Sim", enabled: true, tip: GLOSSARY.backendSim },
-  { id: "endpoint", label: "Endpoint (self-hosted)", enabled: false, tip: GLOSSARY.backendEndpoint },
-  { id: "realmodel", label: "Real model (self-hosted)", enabled: false, tip: GLOSSARY.backendReal },
-];
+// Live backend selector. Reflects the actually-running backend (from the snapshot)
+// and switches it on the server. The real-model and OpenAI-compatible endpoint
+// backends are self-hosted only: switching is disabled on the public demo (a hosted
+// box must stay sim-only — taking an arbitrary endpoint URL server-side is SSRF).
+const TIP: Record<string, string> = {
+  sim: GLOSSARY.backendSim,
+  openai: GLOSSARY.backendEndpoint,
+  realmodel: GLOSSARY.backendReal,
+};
 
-export function BackendSelector() {
+interface Props {
+  current: string; // the backend the server reports running (snapshot.pool.backend)
+}
+
+export function BackendSelector({ current }: Props) {
+  const [info, setInfo] = useState<BackendsInfo | null>(null);
+  const [url, setUrl] = useState("");
+  const [model, setModel] = useState("");
+
+  useEffect(() => {
+    api
+      .getBackends()
+      .then((b) => {
+        setInfo(b);
+        setUrl(b.endpoint.base_url);
+        setModel(b.endpoint.model);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  function choose(id: string) {
+    if (id === "openai") api.setBackend("openai", url, model).catch(() => undefined);
+    else api.setBackend(id).catch(() => undefined);
+  }
+
+  const switchable = info?.switchable ?? false;
+  const options = info?.available ?? [];
+
   return (
     <div className="panel">
       <h3>Backend</h3>
-      {BACKENDS.map((b) => (
-        <label key={b.id} className="row">
-          <input type="radio" name="backend" defaultChecked={b.id === "sim"} disabled={!b.enabled} />
-          {b.label}
-          <InfoTip text={b.tip} label={`What is the ${b.label} backend?`} />
-        </label>
-      ))}
+      {info && !switchable && (
+        <div className="muted">Locked to sim on the public demo (sim-only for safety).</div>
+      )}
+      {options.map((b) => {
+        const disabled = !switchable || !b.available;
+        const tip = b.available ? TIP[b.id] : `${TIP[b.id]} — ${b.reason}`;
+        return (
+          <div key={b.id}>
+            <label className="row">
+              <input
+                type="radio"
+                name="backend"
+                checked={current === b.id}
+                disabled={disabled}
+                onChange={() => choose(b.id)}
+              />
+              {b.label}
+              <InfoTip text={tip} label={`About the ${b.label} backend`} />
+            </label>
+            {b.id === "openai" && switchable && b.available && (
+              <div className="endpoint-config">
+                <input
+                  aria-label="endpoint url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="http://host:11434"
+                />
+                <input
+                  aria-label="endpoint model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="model name"
+                />
+                <button onClick={() => choose("openai")}>Use endpoint</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

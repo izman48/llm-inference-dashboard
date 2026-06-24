@@ -68,6 +68,20 @@ def test_kill_worker_endpoint_reduces_pool() -> None:
     assert after == before - 1
 
 
+def test_backends_listed_and_switchable_live() -> None:
+    c = client()
+    info = c.get("/api/backends").json()
+    assert info["current"] == "sim"
+    assert info["switchable"] is True  # not a public demo
+    ids = {b["id"] for b in info["available"]}
+    assert {"sim", "openai", "realmodel"} <= ids
+
+    r = c.post("/api/backend", json={"backend": "openai", "base_url": "http://x:11434"})
+    assert r.status_code == 200
+    assert r.json()["backend"] == "openai"
+    assert c.get("/api/snapshot").json()["pool"]["backend"] == "openai"
+
+
 def test_reset_endpoint_restores_pool_and_clears_metrics() -> None:
     c = client()
     c.post("/api/submit", json={"prompt_tokens": 50, "max_tokens": 5, "priority": "interactive"})

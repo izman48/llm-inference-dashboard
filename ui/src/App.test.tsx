@@ -20,6 +20,8 @@ const { sample } = vi.hoisted(() => {
       pool: {
         num_workers: 2,
         strategy: "least-pending-tokens",
+        backend: "sim",
+        endpoint: { base_url: "http://localhost:11434", model: "qwen2.5:0.5b" },
         clock_s: 12.3,
         autoscaler: { enabled: true, min_workers: 1, max_workers: 8, target_queue_depth: 4 },
         workers: [
@@ -43,6 +45,16 @@ vi.mock("./api", () => ({
   stopLoadgen: vi.fn().mockResolvedValue({}),
   killWorker: vi.fn().mockResolvedValue({ killed: "w0" }),
   resetPool: vi.fn().mockResolvedValue({ reset: true, num_workers: 2 }),
+  getBackends: vi.fn().mockResolvedValue({
+    current: "sim",
+    switchable: true,
+    available: [
+      { id: "sim", label: "Sim", available: true, reason: "" },
+      { id: "openai", label: "Endpoint (self-hosted)", available: true, reason: "" },
+    ],
+    endpoint: { base_url: "http://localhost:11434", model: "qwen2.5:0.5b" },
+  }),
+  setBackend: vi.fn().mockResolvedValue({ backend: "sim" }),
 }));
 
 import { App } from "./App";

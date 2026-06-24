@@ -98,3 +98,17 @@ def test_strategy_swap_changes_routing_name() -> None:
     pool = build_pool(n_workers=2, autoscale=False)
     pool.set_strategy("round-robin")
     assert pool.router.strategy_name == "round-robin"
+
+
+def test_set_backend_switches_and_rebuilds_pool() -> None:
+    pool = build_pool(n_workers=2, backend="sim", autoscale=False)
+    assert pool.backend == "sim"
+    # switch to the endpoint backend (constructs OpenAIWorkers; no network here)
+    pool.set_backend("openai", base_url="http://example:11434", model="qwen2.5:0.5b")
+    assert pool.backend == "openai"
+    assert pool.endpoint == {"base_url": "http://example:11434", "model": "qwen2.5:0.5b"}
+    assert pool.num_workers == 2  # rebuilt to the initial worker count
+    # and back to sim
+    pool.set_backend("sim")
+    assert pool.backend == "sim"
+    assert pool.num_workers == 2

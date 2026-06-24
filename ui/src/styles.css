@@ -259,3 +259,31 @@ tr.unhealthy td {
   border-color: #d62728;
   color: #ff6b6b;
 }
+
+/* Endpoint (OpenAI-compatible) config under the backend selector. */
+.endpoint-config {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px 22px;
+}
+
+.endpoint-config input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.endpoint-config button {
+  align-self: flex-start;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}

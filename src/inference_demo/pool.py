@@ -24,6 +24,8 @@ from inference_demo.types import Request, WorkerId, WorkerState
 from inference_demo.workers.base import ControlWorker
 
 WorkerFactory = Callable[[WorkerId], ControlWorker]
+# (backend name, base_url|None, model|None) -> (worker factory, pool step_s)
+FactoryBuilder = Callable[[str, "str | None", "str | None"], "tuple[WorkerFactory, float]"]
 
 
 class PoolManager:
@@ -38,6 +40,10 @@ class PoolManager:
         metrics: Metrics,
         autoscale_enabled: bool = True,
         autoscale_every_steps: int = 10,
+        backend: str = "sim",
+        factory_builder: FactoryBuilder | None = None,
+        base_url: str = "",
+        model: str = "",
     ) -> None:
         self._worker_factory = worker_factory
         self.step_s = step_s
@@ -46,6 +52,11 @@ class PoolManager:
         self.metrics = metrics
         self.autoscale_enabled = autoscale_enabled
         self._autoscale_every = autoscale_every_steps
+        # Backend identity + how to rebuild it (for live backend switching).
+        self._backend = backend
+        self._factory_builder = factory_builder
+        self._base_url = base_url
+        self._model = model
 
         self._initial_workers = n_workers
         self._clock = 0.0
@@ -89,6 +100,14 @@ class PoolManager:
     def num_workers(self) -> int:
         return len(self._workers)
 
+    @property
+    def backend(self) -> str:
+        return self._backend
+
+    @property
+    def endpoint(self) -> dict[str, str]:
+        return {"base_url": self._base_url, "model": self._model}
+
     def worker_states(self) -> list[WorkerState]:
         return [w.state() for w in self._workers.values()]
 
@@ -96,6 +115,24 @@ class PoolManager:
 
     def set_strategy(self, name: str) -> None:
         self.router.set_strategy(make_strategy(name))
+
+    def set_backend(
+        self, backend: str, *, base_url: str | None = None, model: str | None = None
+    ) -> None:
+        """Swap the worker backend live (sim <-> endpoint <-> real model) and rebuild
+        the pool from scratch. Backs the console's backend selector. The gateway is
+        responsible for gating this (it's disabled on the public demo — SSRF)."""
+        if self._factory_builder is None:
+            raise RuntimeError("pool was built without a factory builder; cannot switch backend")
+        url = base_url if base_url is not None else self._base_url
+        mdl = model if model is not None else self._model
+        factory, step_s = self._factory_builder(backend, url or None, mdl or None)
+        self._worker_factory = factory
+        self.step_s = step_s
+        self._backend = backend
+        self._base_url = url
+        self._model = mdl
+        self.reset()  # rebuild the starting workers with the new factory + clear metrics
 
     def set_autoscaler(
         self, *, config: AutoscalerConfig | None = None, enabled: bool | None = None
@@ -160,6 +197,8 @@ class PoolManager:
         return {
             "num_workers": self.num_workers,
             "strategy": self.router.strategy_name,
+            "backend": self._backend,
+            "endpoint": {"base_url": self._base_url, "model": self._model},
             "clock_s": round(self._clock, 2),
             "autoscaler": {
                 "enabled": self.autoscale_enabled,
@@ -215,6 +254,24 @@ def _realmodel_factory(model: str, max_batch_size: int) -> WorkerFactory:
     return make
 
 
+def _make_factory(
+    backend: str, *, max_batch_size: int, base_url: str, model: str
+) -> tuple[WorkerFactory, float]:
+    """Map a backend name to its (worker factory, pool step_s). The single place
+    that choice is made — used both at construction and by live ``set_backend``."""
+    if backend == "sim":
+        # step_s matches the gateway's live tick (~0.05s) so one decode step ~ one
+        # tick of real time: sim-time tracks wall-clock, and metrics (throughput
+        # decay, autoscaler cooldowns) read in real seconds rather than 5x slow.
+        profile = SimProfile(step_s=0.05, prefill_tokens_per_step=128)
+        return _sim_factory(max_batch_size, profile), profile.step_s
+    if backend == "openai":
+        return _openai_factory(base_url, model), 0.05  # external server owns decode
+    if backend == "realmodel":
+        return _realmodel_factory(model, max_batch_size), 0.05  # one decode iter / step
+    raise ValueError(f"unknown backend: {backend!r}")
+
+
 def build_pool(
     *,
     backend: str = "sim",
@@ -229,21 +286,13 @@ def build_pool(
     model: str = "qwen2.5:0.5b",
 ) -> PoolManager:
     """Construct a ready-to-run pool with sensible defaults (used by the gateway)."""
-    if backend == "sim":
-        # step_s matches the gateway's live tick (~0.05s) so one decode step ~ one
-        # tick of real time: sim-time tracks wall-clock, and metrics (throughput
-        # decay, autoscaler cooldowns) read in real seconds rather than 5x slow.
-        profile = SimProfile(step_s=0.05, prefill_tokens_per_step=128)
-        factory: WorkerFactory = _sim_factory(max_batch_size, profile)
-        step_s = profile.step_s
-    elif backend == "openai":
-        factory = _openai_factory(base_url, model)
-        step_s = 0.05  # pool tick granularity for metrics (external server decodes)
-    elif backend == "realmodel":
-        factory = _realmodel_factory(model, max_batch_size)
-        step_s = 0.05  # one decode iteration per pool step
-    else:
-        raise ValueError(f"unknown backend: {backend!r}")
+
+    def builder(b: str, url: str | None, m: str | None) -> tuple[WorkerFactory, float]:
+        return _make_factory(
+            b, max_batch_size=max_batch_size, base_url=url or base_url, model=m or model
+        )
+
+    factory, step_s = builder(backend, base_url, model)
 
     router = Router(make_strategy(strategy, seed=seed))
     autoscaler = Autoscaler(
@@ -263,4 +312,8 @@ def build_pool(
         autoscaler=autoscaler,
         metrics=Metrics(),
         autoscale_enabled=autoscale,
+        backend=backend,
+        factory_builder=builder,
+        base_url=base_url,
+        model=model,
     )
