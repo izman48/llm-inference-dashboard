@@ -114,6 +114,12 @@ class RealModelWorker:
         self._cache = None
         self._attn = None
 
+    def set_continuous(self, continuous: bool) -> None:
+        """Switch batching mode (continuous <-> static) live. Safe at any point — the
+        flag is only read in step(); running sequences finish, then admission follows
+        the new rule. No model reload, no dropped work."""
+        self.continuous = continuous
+
     def state(self) -> WorkerState:
         pending = sum(max(0, s.max_new - s.generated) for s in self._running)
         pending += sum(s.max_new for s in self._waiting)

@@ -32,6 +32,7 @@ export interface PoolView {
   num_workers: number;
   strategy: string;
   backend: string;
+  continuous: boolean;
   endpoint: { base_url: string; model: string };
   clock_s: number;
   autoscaler: AutoscalerView;

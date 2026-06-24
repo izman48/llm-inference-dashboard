@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as api from "./api";
 import { AutoscalerPanel } from "./components/AutoscalerPanel";
 import { BackendSelector } from "./components/BackendSelector";
+import { BatchingToggle } from "./components/BatchingToggle";
 import { LoadGenControls } from "./components/LoadGenControls";
 import { MetricCards } from "./components/MetricCards";
 import { RecentRequests } from "./components/RecentRequests";
@@ -88,6 +89,7 @@ export function App() {
         </div>
         <aside className="col-side">
           <BackendSelector current={pool.backend} />
+          <BatchingToggle backend={pool.backend} continuous={pool.continuous} />
           <StrategySwitcher
             strategies={strategies}
             current={pool.strategy}

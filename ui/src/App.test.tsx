@@ -21,6 +21,7 @@ const { sample } = vi.hoisted(() => {
         num_workers: 2,
         strategy: "least-pending-tokens",
         backend: "sim",
+        continuous: true,
         endpoint: { base_url: "http://localhost:11434", model: "qwen2.5:0.5b" },
         clock_s: 12.3,
         autoscaler: { enabled: true, min_workers: 1, max_workers: 8, target_queue_depth: 4 },
@@ -55,6 +56,7 @@ vi.mock("./api", () => ({
     endpoint: { base_url: "http://localhost:11434", model: "qwen2.5:0.5b" },
   }),
   setBackend: vi.fn().mockResolvedValue({ backend: "sim" }),
+  setBatching: vi.fn().mockResolvedValue({ continuous: true, applies: false }),
 }));
 
 import { App } from "./App";

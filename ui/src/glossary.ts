@@ -54,6 +54,15 @@ export const GLOSSARY = {
     "we own the decode loop and the per-sequence KV cache. Host-native only (needs GPU/MPS; " +
     "doesn't run in the demo container).",
 
+  // --- batching mode (real model) ---
+  batchingMode:
+    "Continuous batching admits and evicts sequences every decode step — a finished sequence " +
+    "frees its slot immediately and a waiting one joins the running batch mid-flight (the " +
+    "project's core technique). Static batching admits a whole batch and drains it before " +
+    "starting the next, so the batch runs at the pace of its slowest sequence and the GPU idles " +
+    "on the stragglers. Flip this on a real model under load to watch throughput drop and tail " +
+    "latency climb — the static-vs-continuous story, live.",
+
   // --- routing ---
   strategy:
     "How the router picks which worker handles each request. Switch it live and watch p99 " +

@@ -25,8 +25,8 @@ from inference_demo.types import Request, WorkerId, WorkerState
 from inference_demo.workers.base import ControlWorker
 
 WorkerFactory = Callable[[WorkerId], ControlWorker]
-# (backend name, base_url|None, model|None) -> (worker factory, pool step_s)
-FactoryBuilder = Callable[[str, "str | None", "str | None"], "tuple[WorkerFactory, float]"]
+# (backend, base_url|None, model|None, continuous) -> (worker factory, pool step_s)
+FactoryBuilder = Callable[[str, "str | None", "str | None", bool], "tuple[WorkerFactory, float]"]
 
 
 class PoolManager:
@@ -45,6 +45,7 @@ class PoolManager:
         factory_builder: FactoryBuilder | None = None,
         base_url: str = "",
         model: str = "",
+        continuous: bool = True,
         time_fn: Callable[[], float] = time.monotonic,
     ) -> None:
         self._worker_factory = worker_factory
@@ -59,6 +60,7 @@ class PoolManager:
         self._factory_builder = factory_builder
         self._base_url = base_url
         self._model = model
+        self._continuous = continuous  # real-model batching mode (continuous vs static)
         # Wall clock for advancing time on the real backends (see _advance_dt).
         self._time_fn = time_fn
         self._last_step_wall: float | None = None
@@ -131,13 +133,29 @@ class PoolManager:
             raise RuntimeError("pool was built without a factory builder; cannot switch backend")
         url = base_url if base_url is not None else self._base_url
         mdl = model if model is not None else self._model
-        factory, step_s = self._factory_builder(backend, url or None, mdl or None)
+        factory, step_s = self._factory_builder(backend, url or None, mdl or None, self._continuous)
         self._worker_factory = factory
         self.step_s = step_s
         self._backend = backend
         self._base_url = url
         self._model = mdl
         self.reset()  # rebuild the starting workers with the new factory + clear metrics
+
+    def set_batching(self, continuous: bool) -> None:
+        """Switch real-model workers between continuous and static batching, live and
+        in place — no model reload. Rebuilds the factory so newly-scaled workers match,
+        and flips the running workers. A no-op for sim/openai (their batching isn't ours)."""
+        self._continuous = continuous
+        if self._factory_builder is not None:
+            factory, step_s = self._factory_builder(
+                self._backend, self._base_url or None, self._model or None, continuous
+            )
+            self._worker_factory = factory
+            self.step_s = step_s
+        for w in self._workers.values():
+            setter = getattr(w, "set_continuous", None)
+            if callable(setter):
+                setter(continuous)
 
     def set_autoscaler(
         self, *, config: AutoscalerConfig | None = None, enabled: bool | None = None
@@ -225,6 +243,7 @@ class PoolManager:
             "num_workers": self.num_workers,
             "strategy": self.router.strategy_name,
             "backend": self._backend,
+            "continuous": self._continuous,
             "endpoint": {"base_url": self._base_url, "model": self._model},
             "clock_s": round(self._clock, 2),
             "autoscaler": {
@@ -270,22 +289,25 @@ def _openai_factory(base_url: str, model: str) -> WorkerFactory:
     return make
 
 
-def _realmodel_factory(model: str, max_batch_size: int) -> WorkerFactory:
+def _realmodel_factory(model: str, max_batch_size: int, continuous: bool) -> WorkerFactory:
     from inference_demo.workers.real_model_worker import DEFAULT_MODEL, RealModelWorker
 
     name = model if model != "qwen2.5:0.5b" else DEFAULT_MODEL  # default OpenAI tag -> HF id
 
     def make(wid: WorkerId) -> ControlWorker:
-        return RealModelWorker(wid, model_name=name, max_batch_size=max_batch_size)
+        return RealModelWorker(
+            wid, model_name=name, max_batch_size=max_batch_size, continuous=continuous
+        )
 
     return make
 
 
 def _make_factory(
-    backend: str, *, max_batch_size: int, base_url: str, model: str
+    backend: str, *, max_batch_size: int, base_url: str, model: str, continuous: bool
 ) -> tuple[WorkerFactory, float]:
     """Map a backend name to its (worker factory, pool step_s). The single place
-    that choice is made — used both at construction and by live ``set_backend``."""
+    that choice is made — used both at construction and by live ``set_backend``.
+    ``continuous`` only affects the real-model worker (our batching); sim/openai ignore it."""
     if backend == "sim":
         # step_s matches the gateway's live tick (~0.05s) so one decode step ~ one
         # tick of real time: sim-time tracks wall-clock, and metrics (throughput
@@ -295,7 +317,7 @@ def _make_factory(
     if backend == "openai":
         return _openai_factory(base_url, model), 0.05  # external server owns decode
     if backend == "realmodel":
-        return _realmodel_factory(model, max_batch_size), 0.05  # one decode iter / step
+        return _realmodel_factory(model, max_batch_size, continuous), 0.05  # one decode iter / step
     raise ValueError(f"unknown backend: {backend!r}")
 
 
@@ -312,15 +334,20 @@ def build_pool(
     seed: int | None = None,
     base_url: str = "http://localhost:11434",
     model: str = "qwen2.5:0.5b",
+    continuous: bool = True,
 ) -> PoolManager:
     """Construct a ready-to-run pool with sensible defaults (used by the gateway)."""
 
-    def builder(b: str, url: str | None, m: str | None) -> tuple[WorkerFactory, float]:
+    def builder(b: str, url: str | None, m: str | None, cont: bool) -> tuple[WorkerFactory, float]:
         return _make_factory(
-            b, max_batch_size=max_batch_size, base_url=url or base_url, model=m or model
+            b,
+            max_batch_size=max_batch_size,
+            base_url=url or base_url,
+            model=m or model,
+            continuous=cont,
         )
 
-    factory, step_s = builder(backend, base_url, model)
+    factory, step_s = builder(backend, base_url, model, continuous)
 
     router = Router(make_strategy(strategy, seed=seed))
     autoscaler = Autoscaler(
@@ -345,4 +372,5 @@ def build_pool(
         factory_builder=builder,
         base_url=base_url,
         model=model,
+        continuous=continuous,
     )

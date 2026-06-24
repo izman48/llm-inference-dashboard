@@ -78,6 +78,10 @@ class BackendBody(BaseModel):
     model: str | None = None
 
 
+class BatchingBody(BaseModel):
+    continuous: bool
+
+
 def _available_backends() -> list[dict[str, object]]:
     """Which backends this process can switch to. sim + openai always; realmodel only
     when the heavy deps are installed (host-native; never inside the Linux Docker image)."""
@@ -216,6 +220,14 @@ def create_app(
         pool.set_backend(body.backend, base_url=body.base_url, model=body.model)
         return {"backend": pool.backend, "endpoint": pool.endpoint}
 
+    @app.post("/api/batching", dependencies=gated)
+    def set_batching(body: BatchingBody) -> dict[str, object]:
+        # Continuous vs static batching — only meaningful for the real-model backend
+        # (our decode loop); a no-op for sim/openai, which we surface to the caller.
+        pool.set_batching(body.continuous)
+        effective = pool.backend == "realmodel"
+        return {"continuous": body.continuous, "applies": effective, "backend": pool.backend}
+
     @app.post("/api/autoscaler", dependencies=gated)
     def set_autoscaler(body: AutoscalerBody) -> dict[str, object]:
         c = pool.autoscaler.config
@@ -322,12 +334,15 @@ def _pool_from_env(cfg: GatewayConfig) -> PoolManager:
     # tiny on a laptop (one worker, scale to at most two). sim/openai are cheap.
     n_workers = 1 if backend == "realmodel" else 2
     max_workers = min(2 if backend == "realmodel" else 8, cfg.max_workers_cap)
+    # Start in continuous batching; REALMODEL_CONTINUOUS=0 starts in static (toggle live too).
+    continuous = os.environ.get("REALMODEL_CONTINUOUS", "1").lower() not in ("0", "false", "no")
     return build_pool(
         backend=backend,
         n_workers=n_workers,
         max_workers=max_workers,
         base_url=os.environ.get("OPENAI_BASE_URL", "http://localhost:11434"),
         model=os.environ.get("MODEL_NAME", "qwen2.5:0.5b"),
+        continuous=continuous,
     )
 
 

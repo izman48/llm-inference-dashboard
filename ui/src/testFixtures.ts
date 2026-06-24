@@ -16,6 +16,7 @@ export const sampleSnapshot: Snapshot = {
     num_workers: 2,
     strategy: "least-pending-tokens",
     backend: "sim",
+    continuous: true,
     endpoint: { base_url: "http://localhost:11434", model: "qwen2.5:0.5b" },
     clock_s: 12.3,
     autoscaler: {

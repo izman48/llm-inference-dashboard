@@ -120,6 +120,15 @@ def test_real_backend_advances_by_wall_clock_not_fixed_step() -> None:
     assert pool.clock - seeded == pytest.approx(0.7)  # advanced by wall time, not step_s
 
 
+def test_set_batching_updates_mode_and_is_safe_for_sim() -> None:
+    pool = build_pool(n_workers=2, backend="sim", autoscale=False)
+    assert pool.pool_snapshot()["continuous"] is True
+    pool.set_batching(False)  # sim has no real-model batching — flag updates, workers unaffected
+    assert pool.pool_snapshot()["continuous"] is False
+    pool.submit(_req("r0"))
+    pool.step()  # still advances fine
+
+
 def test_set_backend_switches_and_rebuilds_pool() -> None:
     pool = build_pool(n_workers=2, backend="sim", autoscale=False)
     assert pool.backend == "sim"

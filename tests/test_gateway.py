@@ -68,6 +68,17 @@ def test_kill_worker_endpoint_reduces_pool() -> None:
     assert after == before - 1
 
 
+def test_batching_mode_toggle() -> None:
+    c = client()
+    assert c.get("/api/snapshot").json()["pool"]["continuous"] is True
+    r = c.post("/api/batching", json={"continuous": False})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["continuous"] is False
+    assert body["applies"] is False  # sim backend — toggle is a no-op here
+    assert c.get("/api/snapshot").json()["pool"]["continuous"] is False
+
+
 def test_autoscaler_target_clamped_within_worker_cap() -> None:
     # target_queue_depth must stay coherent — never above the worker cap.
     c = client()

@@ -69,6 +69,9 @@ export async function getBackends(): Promise<BackendsInfo> {
 export const setBackend = (backend: string, base_url?: string, model?: string) =>
   postJSON<{ backend: string }>("/api/backend", { backend, base_url, model });
 
+export const setBatching = (continuous: boolean) =>
+  postJSON<{ continuous: boolean; applies: boolean }>("/api/batching", { continuous });
+
 /** Subscribe to the live SSE snapshot stream. Returns an unsubscribe fn. */
 export function subscribe(onSnapshot: (s: Snapshot) => void): () => void {
   const es = new EventSource("/api/stream");
