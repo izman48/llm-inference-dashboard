@@ -68,6 +68,16 @@ def test_kill_worker_endpoint_reduces_pool() -> None:
     assert after == before - 1
 
 
+def test_autoscaler_target_clamped_within_worker_cap() -> None:
+    # target_queue_depth must stay coherent — never above the worker cap.
+    c = client()
+    r = c.post("/api/autoscaler", json={"max_workers": 2, "target_queue_depth": 8})
+    assert r.status_code == 200
+    cfg = r.json()
+    assert cfg["max_workers"] == 2
+    assert cfg["target_queue_depth"] <= 2
+
+
 def test_backends_listed_and_switchable_live() -> None:
     c = client()
     info = c.get("/api/backends").json()

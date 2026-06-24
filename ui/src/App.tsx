@@ -100,6 +100,7 @@ export function App() {
           <AutoscalerPanel
             autoscaler={pool.autoscaler}
             currentWorkers={pool.num_workers}
+            backend={pool.backend}
             onChange={onAutoscaler}
           />
           <ScenarioButtons

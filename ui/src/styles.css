@@ -287,3 +287,15 @@ tr.unhealthy td {
   font-size: 12px;
   cursor: pointer;
 }
+
+/* Inline caution (e.g. real-model memory note in the autoscaler panel). */
+.warn {
+  background: #2a2113;
+  border: 1px solid #6b5320;
+  color: #e6c34a;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}

@@ -5,16 +5,23 @@ import { InfoTip } from "./InfoTip";
 interface Props {
   autoscaler: AutoscalerView;
   currentWorkers: number;
+  backend: string;
   onChange: (patch: Partial<AutoscalerView>) => void;
 }
 
-export function AutoscalerPanel({ autoscaler, currentWorkers, onChange }: Props) {
+export function AutoscalerPanel({ autoscaler, currentWorkers, backend, onChange }: Props) {
   return (
     <div className="panel">
       <h3>
         Autoscaler
         <InfoTip text={GLOSSARY.autoscaler} label="What is the autoscaler?" />
       </h3>
+      {backend === "realmodel" && (
+        <div className="warn">
+          ⚠ Each real-model worker loads its own copy of the model into memory. Max is capped
+          server-side (default 4) so a high value can't exhaust your RAM.
+        </div>
+      )}
       <label className="row">
         <input
           type="checkbox"

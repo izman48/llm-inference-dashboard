@@ -41,6 +41,9 @@ class GatewayConfig:
     max_workers_cap: int = 1024
     max_rate_cap: float = 100_000.0
     max_tokens_cap: int = 1_000_000
+    # Real-model workers each load their own model copy, so cap that pool tightly to
+    # avoid OOM-ing the host when someone cranks max workers. Override per-machine.
+    realmodel_max_workers: int = 4
 
     @classmethod
     def from_env(cls) -> GatewayConfig:
@@ -50,6 +53,7 @@ class GatewayConfig:
             max_workers_cap=int(os.environ.get("PUBLIC_MAX_WORKERS", "1024")),
             max_rate_cap=float(os.environ.get("PUBLIC_MAX_RATE", "100000")),
             max_tokens_cap=int(os.environ.get("PUBLIC_MAX_TOKENS", "1000000")),
+            realmodel_max_workers=int(os.environ.get("REALMODEL_MAX_WORKERS", "4")),
         )
 
 
@@ -217,15 +221,18 @@ def create_app(
         c = pool.autoscaler.config
         max_workers = body.max_workers if body.max_workers is not None else c.max_workers
         max_workers = min(max_workers, cfg.max_workers_cap)  # hard cap
+        if pool.backend == "realmodel":
+            max_workers = min(max_workers, cfg.realmodel_max_workers)  # one model copy / worker
         min_workers = body.min_workers if body.min_workers is not None else c.min_workers
+        target = body.target_queue_depth
+        if target is None:
+            target = c.target_queue_depth
+        # Keep the target coherent: within the worker cap and above the scale-down line.
+        target = min(max(target, c.scale_down_queue_depth), float(max_workers))
         new_cfg = AutoscalerConfig(
             min_workers=min(min_workers, max_workers),
             max_workers=max_workers,
-            target_queue_depth=(
-                body.target_queue_depth
-                if body.target_queue_depth is not None
-                else c.target_queue_depth
-            ),
+            target_queue_depth=target,
             scale_down_queue_depth=c.scale_down_queue_depth,
             cooldown_s=c.cooldown_s,
         )

@@ -281,6 +281,7 @@ def build_pool(
     autoscale: bool = True,
     min_workers: int = 1,
     max_workers: int = 8,
+    target_queue_depth: float = 4.0,
     seed: int | None = None,
     base_url: str = "http://localhost:11434",
     model: str = "qwen2.5:0.5b",
@@ -299,7 +300,8 @@ def build_pool(
         AutoscalerConfig(
             min_workers=min_workers,
             max_workers=max_workers,
-            target_queue_depth=4.0,
+            # Keep the target within [scale_down, max] so the policy is coherent.
+            target_queue_depth=min(target_queue_depth, float(max_workers)),
             scale_down_queue_depth=1.0,
             cooldown_s=0.5,
         )

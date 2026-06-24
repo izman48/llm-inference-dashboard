@@ -236,7 +236,10 @@ The script starts Ollama and pulls the model for you; the only prerequisite is O
 `Qwen2.5-0.5B-Instruct`) running **our** continuous batching on Apple **MPS**, served host-native
 with the console. The target installs the `realmodel` extra (torch/transformers), builds the UI,
 and serves both from one process; the model (~1 GB) downloads on first run. `make bench-real`
-runs the static-vs-continuous benchmark in the same mode. Override with `MODEL_NAME=…`.
+runs the static-vs-continuous benchmark in the same mode. Override with `MODEL_NAME=…`. Each
+real-model worker loads its own copy of the model, so the autoscaler's max is capped (default
+4, via `REALMODEL_MAX_WORKERS`) to keep a high setting from exhausting memory; the console
+shows that caution in the autoscaler panel.
 
 **5 — Bring-your-own endpoint.** Host-native, point the `openai` backend at any
 OpenAI-compatible server you run (Ollama / vLLM / LM Studio):
