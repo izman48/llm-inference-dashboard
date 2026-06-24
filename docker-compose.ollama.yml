@@ -1,0 +1,21 @@
+# Hybrid real-model stack: the control plane runs in Docker, but the model server
+# (Ollama) runs NATIVELY on the host so it can use the Mac's GPU (Metal). Docker on
+# macOS has no GPU passthrough, so the model itself cannot run in a container here —
+# the dockerized control plane reaches host Ollama over host.docker.internal.
+#
+# Prereqs (host):  ollama serve   +   ollama pull qwen2.5:0.5b   (once)
+# Run:   docker compose -f docker-compose.yml -f docker-compose.ollama.yml up --build
+#        -> console at http://localhost:8080, routing to your real local model.
+#
+# What it shows: routing / autoscaling / observability against a REAL model. Ollama
+# owns the decode loop, so this does NOT demonstrate our continuous batching (use the
+# host-native `realmodel` backend for that).
+services:
+  backend:
+    environment:
+      PUBLIC_DEMO: "0" # release the sim-only lock so WORKER_BACKEND takes effect
+      WORKER_BACKEND: "openai"
+      OPENAI_BASE_URL: "http://host.docker.internal:11434"
+      MODEL_NAME: "${MODEL_NAME:-qwen2.5:0.5b}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # make the alias resolve on Linux hosts too

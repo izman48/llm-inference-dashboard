@@ -138,9 +138,13 @@ Not a read-only dashboard — a console the reviewer operates:
 ## Run modes (how anyone connects)
 
 1. Easiest: hosted live URL (sim backend on a VPS) — click, operate the console.
-2. `docker compose up` — sim backend locally, any OS, zero deps.
-3. Bring-your-own model (local): `WORKER_BACKEND=openai`, `OPENAI_BASE_URL`, `MODEL_NAME`.
-4. Full build: real model host-native (transformers+MPS recommended, or MLX) — recorded demo / screen-share.
+2. `make up` (`docker compose up`) — sim backend locally, any OS, zero deps.
+3. `make up-ollama` — dockerized control plane + a REAL model served by host-native
+   Ollama (reached via `host.docker.internal`; Docker on macOS has no GPU passthrough, so
+   the model stays on the host). Shows routing/observability on a real model, not our batching.
+4. Bring-your-own model (local, host-native): `WORKER_BACKEND=openai`, `OPENAI_BASE_URL`, `MODEL_NAME`.
+5. Full build: real model host-native (transformers+MPS recommended, or MLX) — our continuous
+   batching; recorded demo / screen-share. The only mode that shows our batcher live.
 
 ## Tech stack
 
@@ -245,6 +249,13 @@ Python is managed with `uv`; the venv is pinned to 3.12 via `.python-version`.
   + `CONTROL_TOKEN` set. Env caps: `PUBLIC_DEMO`, `PUBLIC_MAX_WORKERS`,
   `PUBLIC_MAX_RATE`, `PUBLIC_MAX_TOKENS`, `CONTROL_TOKEN`. Caddy never proxies
   `/metrics` (internals stay private).
+- `make up-ollama` — `docker compose -f docker-compose.yml -f docker-compose.ollama.yml
+  up --build`: the same dockerized control plane, but the override sets `PUBLIC_DEMO=0`
+  + `WORKER_BACKEND=openai` + `OPENAI_BASE_URL=http://host.docker.internal:11434` so it
+  routes to a REAL model served by host-native Ollama (`ollama serve` + `ollama pull
+  qwen2.5:0.5b` first; `MODEL_NAME` overrides the tag). Docker on macOS has no GPU
+  passthrough, so the model must stay on the host — this exercises routing/observability
+  on a real model, NOT our batching. `extra_hosts` maps `host.docker.internal` on Linux.
 
 Backends (phase 6). `make dev` reads `WORKER_BACKEND` (default `sim`):
 

@@ -194,14 +194,58 @@ make ui-install   # first time only
 make ui-dev       # console on http://localhost:5273
 ```
 
-Four ways anyone can connect:
+### Ways to run it
 
-1. **Hosted** — the live URL above (sim backend on a VPS). Click and operate.
-2. **Docker** — `make up` → full sim stack at `http://localhost:8080`, any OS, zero deps.
-3. **Bring your own model (local)** — `WORKER_BACKEND=openai OPENAI_BASE_URL=… MODEL_NAME=… make dev`
-   (e.g. point at `ollama run qwen2.5:0.5b`).
-4. **Full real-model** — `uv sync --extra realmodel`, then `WORKER_BACKEND=realmodel make dev` or
-   `make bench-real` (host-native, Apple MPS; downloads the model on first run).
+Pick by what you want to show. "Our batching?" is the key column — our continuous
+batching only runs when *we* own the decode loop (sim or the host-native real model);
+anything backed by an external server (Ollama/vLLM) exercises the control plane but not
+our batcher.
+
+| # | Mode | Command | Dockerized? | Real model? | Our batching? |
+|---|------|---------|:-----------:|:-----------:|:-------------:|
+| 1 | **Hosted demo** | open the live URL above | n/a | ❌ sim | ✅ |
+| 2 | **Docker (sim)** | `make up` → `localhost:8080` | ✅ everything | ❌ sim | ✅ |
+| 3 | **Docker + real model (Ollama hybrid)** | `make up-ollama` → `localhost:8080` | ✅ control plane | ✅ | ❌ (Ollama's) |
+| 4 | **Local dev, bring-your-own model** | `WORKER_BACKEND=openai OPENAI_BASE_URL=… MODEL_NAME=… make dev` | ❌ host-native | ✅ | ❌ (server's) |
+| 5 | **Full real model (our batcher)** | `uv sync --extra realmodel` → `WORKER_BACKEND=realmodel make dev` | ❌ host-native | ✅ | ✅ **ours** |
+
+**1 — Hosted demo.** Sim backend on the VPS; click and operate. Zero setup, but sim-only
+(see Honesty constraints).
+
+**2 — Docker (sim).** `make up` builds the whole stack (control plane + console) and serves
+it at `http://localhost:8080`. Any OS, zero deps, no model. The portable way to drive the
+routing / autoscaling / observability spine.
+
+**3 — Docker + real model (Ollama hybrid).** The control plane runs in Docker, but the model
+runs **natively on the host** via Ollama — because Docker on macOS has **no GPU passthrough**,
+so a model inside a container would be CPU-only. The dockerized control plane reaches host
+Ollama over `host.docker.internal`. This mirrors production (the model server is always a
+separate process from the control plane). Setup:
+
+```bash
+ollama serve            # in one terminal (or the Ollama app)
+ollama pull qwen2.5:0.5b
+make up-ollama          # control plane in Docker → real local model; console at :8080
+# override the model with: MODEL_NAME=llama3.2:3b make up-ollama
+```
+
+Shows real routing/observability against a real model; **Ollama owns the decode loop, so this
+is not our batching.**
+
+**4 — Local dev, bring-your-own model.** Same idea as 3 but fully host-native (no Docker) and
+points at any OpenAI-compatible server you run (Ollama / vLLM / LM Studio):
+`WORKER_BACKEND=openai OPENAI_BASE_URL=http://localhost:11434 MODEL_NAME=qwen2.5:0.5b make dev`.
+
+**5 — Full real model, our batcher.** The headline mode: a real model (default
+`Qwen2.5-0.5B-Instruct`) running **our** continuous batching on Apple MPS. Host-native only.
+`uv sync --extra realmodel`, then `WORKER_BACKEND=realmodel make dev`, or `make bench-real` for
+the static-vs-continuous benchmark. Downloads the model (~1 GB) on first run.
+
+> **Why no single "real model in one container"?** Docker Desktop on macOS runs containers in a
+> Linux VM with no access to Apple's GPU (Metal/MPS), so a containerized model is CPU-only and
+> `torch`'s MPS device isn't even available. Hence modes 3–4 keep the model on the host. On Linux
+> with an NVIDIA GPU + the container toolkit you *can* give a container the GPU and collapse this
+> into one stack.
 
 ## How it's engineered
 
@@ -270,5 +314,7 @@ src/inference_demo/
   workers/            Worker protocol, SimWorker, OpenAIWorker, RealModelWorker
   bench/              static-vs-continuous benchmarks (sim + real model)
 ui/                   React + TypeScript control console (Vite)
-deploy/               Dockerfiles, Caddyfile, compose overlays
+deploy/               Dockerfiles, Caddyfile, prod/co-host compose overlays
+docker-compose.yml    sim stack (control plane + console) — `make up`
+docker-compose.ollama.yml  override: control plane → host-native Ollama — `make up-ollama`
 ```

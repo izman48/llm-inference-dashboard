@@ -39,3 +39,9 @@ ui-test:
 # Full sim stack (control plane + console) via Docker; serves http://localhost:8080
 up:
 	docker compose up --build
+
+# Hybrid: dockerized control plane + a REAL model served by host-native Ollama
+# (Docker on macOS can't reach the GPU). Needs `ollama serve` + the model pulled.
+# Serves http://localhost:8080; set MODEL_NAME to override the default tag.
+up-ollama:
+	docker compose -f docker-compose.yml -f docker-compose.ollama.yml up --build
