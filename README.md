@@ -184,20 +184,33 @@ tooltip explaining the jargon):
 
 ## Running it
 
+Everything is a `make` target. `make help` is unnecessary — the full list:
+
 ```bash
+# --- setup & quality gates ---
 make setup        # uv sync --extra dev (Python 3.12, managed by uv)
 make test         # pytest — scheduler property tests, routing, autoscaler, metrics, API contracts
 make lint         # ruff check + format --check
 make typecheck    # mypy (strict on src/)
-make bench        # produce the static-vs-continuous money graph
-```
 
-**Run the live control plane** (two terminals — the UI proxies `/api` to the gateway):
+# --- benchmarks: the static-vs-continuous "money graph" ---
+make bench        # sim backend — writes static_vs_continuous.{svg,md} to src/inference_demo/bench/out/
+make bench-real   # REAL model, host-native (Apple MPS; installs the realmodel extra) — writes
+                  # real_static_vs_continuous.{svg,md}. The honest, apples-to-apples throughput
+                  # claim: static vs continuous batching on the same model + worker. ~1 GB on first run.
 
-```bash
-make dev          # backend gateway on http://127.0.0.1:8000
-make ui-install   # first time only
-make ui-dev       # console on http://localhost:5273
+# --- run the live console (turnkey: free port, builds, opens the browser) ---
+make up           # Docker sim stack (no model, any OS)
+make up-ollama    # Docker control plane + real model via host-native Ollama (auto-starts + pulls it)
+make up-realmodel # host-native real model with OUR continuous batching (Apple MPS)
+                  # ↳ see "Ways to run it" below for what each mode shows
+
+# --- develop the gateway + console separately, with hot-reload ---
+make dev          # gateway on http://127.0.0.1:8000  (WORKER_BACKEND=sim|openai|realmodel)
+make ui-install   # install console deps (first time only)
+make ui-dev       # Vite dev server on http://localhost:5273 (proxies /api to the gateway)
+make ui-build     # production build of the console (tsc -b && vite build)
+make ui-test      # Vitest component + smoke tests
 ```
 
 ### Ways to run it
